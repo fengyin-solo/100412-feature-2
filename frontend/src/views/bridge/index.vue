@@ -11,6 +11,8 @@
       </div>
     </header>
 
+    <p class="lock-hint">廊桥清单的「机位锁定结论」由机位分配模块同步：机位锁定后对应廊桥显示已锁定航班，机位释放后自动解除，本模块不手工改判。</p>
+
     <div class="stat-row">
       <article v-for="item in stats" :key="item.label" class="stat-card">
         <span class="stat-label">{{ item.label }}</span>
@@ -43,7 +45,12 @@
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td v-for="column in columns" :key="column">
+            <span v-if="column === '机位锁定结论'" :class="['lock-tag', row[column] ? 'lock-on' : '']">
+              {{ row[column] || '未锁定' }}
+            </span>
+            <span v-else>{{ row[column] ?? '—' }}</span>
+          </td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
@@ -82,16 +89,21 @@ import {
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('bridge')
-const columns = ["廊桥编号", "所属机位", "对接机型", "调度人员", "计划对接", "实际对接", "脱离时间", "廊桥状态"]
+const columns = meta.fields
 const actions = ["安排对接", "确认脱离", "停用报修"]
 const statuses = ["待对接", "已对接", "已脱离", "故障停用"]
-const stats = [{"label": "待对接廊桥", "value": 0}, {"label": "已对接廊桥", "value": 0}, {"label": "故障廊桥", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const stats = computed(() => [
+  { label: '待对接廊桥', value: rows.value.filter((row) => row.status === '待对接').length },
+  { label: '已对接廊桥', value: rows.value.filter((row) => row.status === '已对接').length },
+  { label: '故障廊桥', value: rows.value.filter((row) => row.status === '故障停用').length },
+  { label: '机位已锁定廊桥', value: rows.value.filter((row) => String(row['机位锁定结论'] ?? '') !== '').length },
+])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -135,3 +147,27 @@ function reload() {
 
 onMounted(reload)
 </script>
+
+<style scoped>
+.lock-hint {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #475569;
+  background: #eef4ff;
+  border: 1px solid #c7d9f7;
+  border-radius: 6px;
+}
+.lock-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--muted);
+  background: #eef2f7;
+}
+.lock-tag.lock-on {
+  color: #067647;
+  background: #e7f6ec;
+}
+</style>
